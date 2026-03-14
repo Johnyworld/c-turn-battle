@@ -1,0 +1,12 @@
+{
+  "name": "hex-turn-battle",
+  "version": "1.0.0",
+  "description": "WW2 헥스 격자 턴제 3진영 전투 게임",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}

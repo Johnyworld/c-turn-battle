@@ -1,0 +1,97 @@
+{
+  "version": "2.0",
+  "lastUpdated": "2026-03-14T12:11:39.491Z",
+  "activeFeatures": [
+    "test-claude-turn-battle",
+    "js"
+  ],
+  "primaryFeature": "test-claude-turn-battle",
+  "features": {
+    "test-claude-turn-battle": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-14T12:08:24.487Z",
+        "lastUpdated": "2026-03-14T12:08:24.487Z"
+      },
+      "lastFile": "/Users/gimjaehwan/dev/test-claude-turn-battle/server.js"
+    },
+    "js": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-03-14T12:09:14.866Z",
+        "lastUpdated": "2026-03-14T12:11:39.491Z"
+      },
+      "lastFile": "/Users/gimjaehwan/dev/test-claude-turn-battle/public/js/main.js"
+    }
+  },
+  "pipeline": {
+    "currentPhase": 1,
+    "level": "Dynamic",
+    "phaseHistory": []
+  },
+  "session": {
+    "startedAt": "2026-03-14T11:37:22.362Z",
+    "onboardingCompleted": false,
+    "lastActivity": "2026-03-14T12:11:39.491Z"
+  },
+  "history": [
+    {
+      "timestamp": "2026-03-14T12:08:24.487Z",
+      "feature": "test-claude-turn-battle",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-14T12:09:14.866Z",
+      "feature": "js",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-14T12:09:31.028Z",
+      "feature": "js",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-14T12:10:03.060Z",
+      "feature": "js",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-14T12:10:19.316Z",
+      "feature": "js",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-14T12:10:49.379Z",
+      "feature": "js",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-14T12:11:11.365Z",
+      "feature": "js",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-03-14T12:11:39.491Z",
+      "feature": "js",
+      "phase": "do",
+      "action": "updated"
+    }
+  ]
+}

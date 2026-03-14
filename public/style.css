@@ -1,0 +1,244 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #1a1a1a;
+  color: #ddd;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+#header {
+  background: #111;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 2px solid #444;
+  flex-shrink: 0;
+  min-height: 40px;
+}
+
+#header h1 {
+  font-size: 13px;
+  color: #c8a84b;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+#turn-info {
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+#phase-info {
+  font-size: 12px;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+#btn-end-turn {
+  margin-left: auto;
+  padding: 4px 12px;
+  background: #555;
+  color: #fff;
+  border: 1px solid #888;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+#btn-end-turn:hover { background: #777; }
+
+#btn-new-game {
+  padding: 4px 12px;
+  background: #3a3a2a;
+  color: #c8a84b;
+  border: 1px solid #c8a84b;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+#btn-new-game:hover { background: #4a4a3a; }
+
+/* ── Main Layout ── */
+#main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+#canvas-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: #1e2010;
+}
+
+#gameCanvas {
+  display: block;
+  cursor: pointer;
+}
+
+/* ── Overlay ── */
+#overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 10;
+}
+#overlay.show { display: flex; }
+
+#overlay h2 {
+  font-size: 26px;
+  color: #c8a84b;
+  margin-bottom: 10px;
+}
+#overlay p {
+  font-size: 14px;
+  color: #ccc;
+  margin-bottom: 20px;
+}
+#btn-overlay-new {
+  padding: 9px 24px;
+  background: #c8a84b;
+  color: #111;
+  border: none;
+  border-radius: 4px;
+  font-size: 15px;
+  font-family: inherit;
+  font-weight: bold;
+  cursor: pointer;
+}
+#btn-overlay-new:hover { background: #dabb5c; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 220px;
+  background: #111;
+  border-left: 2px solid #444;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-section {
+  padding: 8px;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.sidebar-section h3,
+#battle-log-section h3 {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+/* Unit Info */
+#unit-name {
+  font-size: 12px;
+  font-weight: bold;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+#unit-stats {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #bbb;
+}
+
+.hp-bar-bg {
+  background: #333;
+  height: 5px;
+  border-radius: 3px;
+  margin: 2px 0 4px;
+}
+.hp-bar {
+  height: 5px;
+  border-radius: 3px;
+}
+
+/* Faction Status */
+.faction-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+  font-size: 11px;
+}
+.faction-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.faction-label {
+  min-width: 36px;
+}
+.faction-hp-track {
+  flex: 1;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+}
+.faction-hp-fill {
+  height: 4px;
+  border-radius: 2px;
+}
+.faction-meta {
+  font-size: 10px;
+  color: #555;
+  white-space: nowrap;
+}
+
+/* Legend */
+#legend {
+  font-size: 10px;
+  color: #666;
+  line-height: 1.9;
+}
+
+/* Battle Log */
+#battle-log-section {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px 0;
+}
+
+#log-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.log-entry {
+  font-size: 10px;
+  color: #888;
+  padding: 2px 0;
+  border-bottom: 1px solid #1e1e1e;
+  line-height: 1.4;
+}
+.log-entry.combat { color: #e88; }
+.log-entry.move   { color: #88e; }
+.log-entry.heal   { color: #8e8; }
+.log-entry.system { color: #da4; }
