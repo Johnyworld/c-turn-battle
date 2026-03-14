@@ -4,10 +4,81 @@ body {
   background: #1a1a1a;
   color: #ddd;
   font-family: 'Courier New', monospace;
-  display: flex;
-  flex-direction: column;
   height: 100vh;
   overflow: hidden;
+}
+
+/* ── 진영 선택 화면 ── */
+#faction-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #111;
+  gap: 32px;
+}
+
+.fs-title {
+  font-size: 26px;
+  color: #c8a84b;
+  letter-spacing: 4px;
+}
+
+.fs-subtitle {
+  font-size: 13px;
+  color: #666;
+  letter-spacing: 1px;
+}
+
+.fs-cards {
+  display: flex;
+  gap: 40px;
+}
+
+.fs-card {
+  width: 180px;
+  height: 220px;
+  border: 2px solid #444;
+  border-radius: 8px;
+  background: #1a1a1a;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-family: 'Courier New', monospace;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.fs-card.allied { border-color: #3a7fd5; }
+.fs-card.allied:hover { border-color: #6af; background: #0d1a2d; }
+
+.fs-card.axis { border-color: #b03030; }
+.fs-card.axis:hover { border-color: #f66; background: #2d0d0d; }
+
+.fs-card-icon { font-size: 38px; }
+.fs-card.allied .fs-card-icon { color: #6af; }
+.fs-card.axis .fs-card-icon { color: #f66; }
+
+.fs-card-name {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ddd;
+}
+
+.fs-card-desc {
+  font-size: 11px;
+  color: #555;
+  letter-spacing: 3px;
+}
+
+/* ── 전투 화면 ── */
+#game-screen {
+  display: none;
+  flex-direction: column;
+  height: 100vh;
 }
 
 /* ── Header ── */
@@ -127,7 +198,7 @@ body {
   color: #ccc;
   margin-bottom: 20px;
 }
-#btn-overlay-new {
+#btn-overlay-retry {
   padding: 9px 24px;
   background: #c8a84b;
   color: #111;
@@ -138,7 +209,19 @@ body {
   font-weight: bold;
   cursor: pointer;
 }
-#btn-overlay-new:hover { background: #dabb5c; }
+#btn-overlay-retry:hover { background: #dabb5c; }
+
+#btn-overlay-reselect {
+  padding: 7px 18px;
+  background: transparent;
+  color: #888;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+#btn-overlay-reselect:hover { border-color: #999; color: #ccc; }
 
 /* ── Sidebar ── */
 #sidebar {

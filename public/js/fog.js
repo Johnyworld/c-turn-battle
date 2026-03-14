@@ -3,17 +3,18 @@ import { hexDistance } from './hex.js';
 
 const SIGHT_RADIUS = 3;
 
-// ── 연합군 시야 계산 → 가시 헥스 Set<"col,row"> 반환 ──
+// ── 플레이어 진영 시야 계산 → 가시 헥스 Set<"col,row"> 반환 ──
 export function computeVisibleHexes(state) {
   const visible = new Set();
+  const pf = state.playerFaction;
 
-  // 연합군 살아있는 유닛 시야
+  // 플레이어 진영 살아있는 유닛 시야
   state.units
-    .filter(u => u.factionId === 0 && u.hp > 0)
+    .filter(u => u.factionId === pf && u.hp > 0)
     .forEach(u => addSightCircle(visible, u.col, u.row));
 
-  // 연합군 기지는 항상 가시
-  const base = state.bases[0];
+  // 플레이어 기지는 항상 가시
+  const base = state.bases.find(b => b.factionId === pf);
   if (base) addSightCircle(visible, base.col, base.row);
 
   return visible;

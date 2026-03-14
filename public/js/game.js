@@ -5,6 +5,8 @@ import { getReachable, hexDistance, hexNeighbors } from './hex.js';
 export const state = {
   turn: 1,
   currentFaction: 0,
+  playerFaction: 0,   // 플레이어가 선택한 진영 id
+  aiFaction: 1,       // AI가 조종하는 진영 id
   bases: [],
   units: [],
   selected: null,     // 선택된 유닛 id
@@ -18,11 +20,13 @@ export const state = {
 let _unitIdSeq = 0;
 
 // ── 상태 초기화 ──
-export function initState() {
+export function initState(playerFaction = 0) {
   _unitIdSeq = 0;
 
   state.turn = 1;
   state.currentFaction = 0;
+  state.playerFaction = playerFaction;
+  state.aiFaction = 1 - playerFaction;
   state.selected = null;
   state.reachable = [];
   state.attackable = [];
@@ -125,15 +129,9 @@ export function endTurn() {
 
   clearSelection();
 
-  // 다음 살아있는 진영 탐색
-  let next = (state.currentFaction + 1) % 3;
-  let tries = 0;
-  while (state.defeated.includes(next) && tries < 3) {
-    next = (next + 1) % 3;
-    tries++;
-  }
-
-  if (next <= state.currentFaction) state.turn++;
+  // 2진영 전환 (0↔1)
+  const next = 1 - state.currentFaction;
+  if (next === 0) state.turn++;
   state.currentFaction = next;
 }
 

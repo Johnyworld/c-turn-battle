@@ -100,11 +100,11 @@ function doAttack(unit, target) {
 }
 
 // ── 적 기지 방향으로 이동 ──
-// 연합군 기지를 우선 목표로, 이동 가능 헥스 중 목표와 가장 가까운 위치 선택
+// 적 진영(= 플레이어 진영) 기지를 목표로, 이동 가능 헥스 중 목표와 가장 가까운 위치 선택
 function aiMove(unit) {
-  // 목표: 연합군 기지 (factionId 0), 없으면 아무 살아있는 적 기지
+  const playerFaction = state.playerFaction;
   const targetBase =
-    state.bases.find(b => b.factionId === 0 && b.hp > 0) ||
+    state.bases.find(b => b.factionId === playerFaction && b.hp > 0) ||
     state.bases.find(b => b.factionId !== unit.factionId && b.hp > 0 && !state.defeated.includes(b.factionId));
 
   if (!targetBase) return false;

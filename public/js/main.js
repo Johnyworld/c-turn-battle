@@ -22,6 +22,40 @@ const ctx = canvas.getContext('2d');
 let fogEnabled = true;
 let isAiTurn = false;
 
+// ── 진영 선택 화면 제어 ──
+function showFactionSelect() {
+  hideOverlay();
+  document.getElementById('faction-select').style.display = 'flex';
+  document.getElementById('game-screen').style.display = 'none';
+}
+
+function showGameScreen() {
+  document.getElementById('faction-select').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'flex';
+}
+
+// ── 게임 시작 (진영 선택 후 호출) ──
+function startGame(playerFaction) {
+  showGameScreen();
+  hideOverlay();
+  isAiTurn = false;
+  initState(playerFaction);
+  updateFogButton();
+  addLog(state, '=== 새 게임 시작 ===', 'system');
+  addLog(state, `플레이어: ${FACTIONS[playerFaction].name} / AI: ${FACTIONS[state.aiFaction].name}`, 'system');
+  addLog(state, `${FACTIONS[0].name}의 턴`, 'system');
+  updateHeader(state);
+  updateSidebar(null, state);
+  resizeCanvas();
+  redraw();
+
+  // 플레이어가 추축군(id=1)을 선택한 경우 — 연합군(id=0)이 먼저 턴
+  // 연합군 턴이 AI 턴이면 자동 시작
+  if (state.currentFaction === state.aiFaction) {
+    _runAiTurnAsync();
+  }
+}
+
 // ── Canvas 리사이즈 ──
 function resizeCanvas() {
   const container = document.getElementById('canvas-container');
@@ -36,17 +70,31 @@ function redraw() {
   render(canvas, ctx, state, fogEnabled, visibleSet);
 }
 
-// ── 새 게임 ──
-function newGame() {
-  hideOverlay();
-  isAiTurn = false;
-  initState();
-  updateFogButton();
-  addLog(state, '=== 새 게임 시작 ===', 'system');
-  addLog(state, `${FACTIONS[0].name}의 턴`, 'system');
-  updateHeader(state);
-  updateSidebar(null, state);
+// ── AI 턴 실행 (async) ──
+async function _runAiTurnAsync() {
+  if (state.winner !== null) return;
+  isAiTurn = true;
+  updateAiTurnUI(true);
+  addLog(state, `--- ${FACTIONS[state.currentFaction].name} AI 턴 (Turn ${state.turn}) ---`, 'system');
   redraw();
+
+  await runAiTurn(state.currentFaction, () => {
+    renderLog(state);
+    redraw();
+  });
+
+  isAiTurn = false;
+  updateAiTurnUI(false);
+
+  const winner = checkWinCondition();
+  if (winner !== null) {
+    handleGameEnd(winner);
+    redraw();
+    return;
+  }
+
+  // AI 턴 완료 → 플레이어 턴으로 전환
+  await endTurn();
 }
 
 // ── 턴 종료 ──
@@ -59,30 +107,9 @@ async function endTurn() {
   updateHeader(state);
   updateSidebar(null, state);
 
-  // AI 진영 턴이면 자동 실행
-  if (state.currentFaction !== 0 && !state.defeated.includes(state.currentFaction)) {
-    isAiTurn = true;
-    updateAiTurnUI(true);
-    addLog(state, `--- ${FACTIONS[state.currentFaction].name} AI 턴 (Turn ${state.turn}) ---`, 'system');
-    redraw();
-
-    await runAiTurn(state.currentFaction, (unit) => {
-      renderLog(state);
-      redraw();
-    });
-
-    isAiTurn = false;
-    updateAiTurnUI(false);
-
-    const winner = checkWinCondition();
-    if (winner !== null) {
-      handleGameEnd(winner);
-      redraw();
-      return;
-    }
-
-    // 다음 턴이 또 AI면 연속 진행, 아니면 플레이어 턴
-    await endTurn();
+  // 다음 진영이 AI 진영이면 자동 실행
+  if (state.currentFaction === state.aiFaction && !state.defeated.includes(state.currentFaction)) {
+    await _runAiTurnAsync();
   } else {
     addLog(state, `--- ${FACTIONS[state.currentFaction].name}의 턴 (Turn ${state.turn}) ---`, 'system');
     redraw();
@@ -188,6 +215,7 @@ function _handleClickNoSelection(col, row) {
   const unit = getUnitAt(col, row);
   if (!unit) return;
   if (unit.factionId !== state.currentFaction) return;
+  if (unit.factionId !== state.playerFaction) return; // AI 진영 유닛 클릭 차단
   if (state.defeated.includes(unit.factionId)) return;
   if (unit.moved && unit.attacked) return;
   selectUnit(unit);
@@ -198,7 +226,11 @@ function handleGameEnd(winner) {
   if (winner === -1) {
     showOverlay('무승부', '모든 진영의 기지가 함락되었습니다.');
   } else {
-    showOverlay(`${FACTIONS[winner].name} 승리!`, '모든 적 기지가 함락되었습니다.');
+    const isPlayerWin = winner === state.playerFaction;
+    showOverlay(
+      isPlayerWin ? '승리!' : '패배...',
+      `${FACTIONS[winner].name}이(가) 승리했습니다.`
+    );
   }
 }
 
@@ -226,13 +258,21 @@ function updateAiTurnUI(active) {
 }
 
 // ── 이벤트 바인딩 ──
+
+// 진영 선택 화면
+document.getElementById('btn-allied').addEventListener('click', () => startGame(0));
+document.getElementById('btn-axis').addEventListener('click',   () => startGame(1));
+
+// 전투 화면
 canvas.addEventListener('click', handleClick);
 window.addEventListener('resize', resizeCanvas);
 document.getElementById('btn-end-turn').addEventListener('click', endTurn);
-document.getElementById('btn-new-game').addEventListener('click', newGame);
-document.getElementById('btn-overlay-new').addEventListener('click', newGame);
+document.getElementById('btn-new-game').addEventListener('click', () => startGame(state.playerFaction));
 document.getElementById('btn-fog-toggle').addEventListener('click', toggleFog);
 
-// ── 초기 실행 ──
-resizeCanvas();
-newGame();
+// 게임 오버 오버레이
+document.getElementById('btn-overlay-retry').addEventListener('click',    () => startGame(state.playerFaction));
+document.getElementById('btn-overlay-reselect').addEventListener('click', showFactionSelect);
+
+// ── 초기 실행: 진영 선택 화면 표시 ──
+showFactionSelect();

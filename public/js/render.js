@@ -53,7 +53,7 @@ export function render(canvas, ctx, state, fogEnabled = false, visibleSet = null
   // 2. 기지
   state.bases.forEach(base => {
     // 비가시 적 기지 스킵
-    if (fogEnabled && base.factionId !== 0 && !isVisible(base.col, base.row)) return;
+    if (fogEnabled && base.factionId !== state.playerFaction && !isVisible(base.col, base.row)) return;
 
     const { x, y } = hexCenter(base.col, base.row);
     const faction = FACTIONS[base.factionId];
@@ -82,7 +82,7 @@ export function render(canvas, ctx, state, fogEnabled = false, visibleSet = null
   // 3. 유닛
   state.units.filter(u => u.hp > 0).forEach(unit => {
     // 비가시 적 유닛 스킵
-    if (fogEnabled && unit.factionId !== 0 && !isVisible(unit.col, unit.row)) return;
+    if (fogEnabled && unit.factionId !== state.playerFaction && !isVisible(unit.col, unit.row)) return;
 
     const { x, y } = hexCenter(unit.col, unit.row);
     const faction = FACTIONS[unit.factionId];

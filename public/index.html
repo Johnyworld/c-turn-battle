@@ -8,53 +8,74 @@
 </head>
 <body>
 
-  <div id="header">
-    <h1>⚔ WW2 HEX BATTLE ⚔</h1>
-    <div id="turn-info">Turn 1</div>
-    <div id="phase-info">연합군의 턴</div>
-    <button id="btn-fog-toggle">FOG ON</button>
-    <button id="btn-end-turn">턴 종료</button>
-    <button id="btn-new-game">새 게임</button>
+  <!-- ① 진영 선택 화면 -->
+  <div id="faction-select">
+    <div class="fs-title">⚔ WW2 HEX BATTLE ⚔</div>
+    <div class="fs-subtitle">진영을 선택하세요</div>
+    <div class="fs-cards">
+      <button id="btn-allied" class="fs-card allied">
+        <div class="fs-card-icon">★</div>
+        <div class="fs-card-name">연합군</div>
+        <div class="fs-card-desc">ALLIES</div>
+      </button>
+      <button id="btn-axis" class="fs-card axis">
+        <div class="fs-card-icon">★</div>
+        <div class="fs-card-name">추축군</div>
+        <div class="fs-card-desc">AXIS</div>
+      </button>
+    </div>
   </div>
 
-  <div id="main">
-    <div id="canvas-container">
-      <canvas id="gameCanvas"></canvas>
-      <div id="overlay">
-        <h2 id="overlay-title">승리!</h2>
-        <p id="overlay-msg"></p>
-        <button id="btn-overlay-new">새 게임</button>
-      </div>
+  <!-- ② 전투 화면 -->
+  <div id="game-screen">
+    <div id="header">
+      <h1>⚔ WW2 HEX BATTLE ⚔</h1>
+      <div id="turn-info">Turn 1</div>
+      <div id="phase-info">연합군의 턴</div>
+      <button id="btn-fog-toggle">FOG ON</button>
+      <button id="btn-end-turn">턴 종료</button>
+      <button id="btn-new-game">새 게임</button>
     </div>
 
-    <div id="sidebar">
-      <section class="sidebar-section" id="unit-info">
-        <h3>유닛 정보</h3>
-        <div id="unit-name">유닛을 선택하세요</div>
-        <div id="unit-stats"></div>
-      </section>
-
-      <section class="sidebar-section" id="faction-status">
-        <h3>진영 상태</h3>
-        <div id="faction-rows"></div>
-      </section>
-
-      <section class="sidebar-section" id="legend-section">
-        <h3>범례</h3>
-        <div id="legend">
-          <span style="color:#6af">■ 연합군</span>
-          <span style="color:#f66">■ 추축군</span>
-          <span style="color:#fb0">■ 소련군</span><br>
-          T=탱크 &nbsp;A=야포 &nbsp;I=보병<br>
-          AT=대전차 &nbsp;M=의무병<br>
-          ★=기지 &nbsp;녹=이동 &nbsp;주=공격
+    <div id="main">
+      <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="overlay">
+          <h2 id="overlay-title">승리!</h2>
+          <p id="overlay-msg"></p>
+          <button id="btn-overlay-retry">재도전</button>
+          <button id="btn-overlay-reselect">진영 재선택</button>
         </div>
-      </section>
+      </div>
 
-      <section id="battle-log-section">
-        <h3>전투 기록</h3>
-        <div id="log-list"></div>
-      </section>
+      <div id="sidebar">
+        <section class="sidebar-section" id="unit-info">
+          <h3>유닛 정보</h3>
+          <div id="unit-name">유닛을 선택하세요</div>
+          <div id="unit-stats"></div>
+        </section>
+
+        <section class="sidebar-section" id="faction-status">
+          <h3>진영 상태</h3>
+          <div id="faction-rows"></div>
+        </section>
+
+        <section class="sidebar-section" id="legend-section">
+          <h3>범례</h3>
+          <div id="legend">
+            <span style="color:#6af">■ 연합군</span>
+            <span style="color:#f66">■ 추축군</span><br>
+            T=탱크 &nbsp;A=야포 &nbsp;I=보병<br>
+            AT=대전차 &nbsp;M=의무병<br>
+            ★=기지 &nbsp;녹=이동 &nbsp;주=공격
+          </div>
+        </section>
+
+        <section id="battle-log-section">
+          <h3>전투 기록</h3>
+          <div id="log-list"></div>
+        </section>
+      </div>
     </div>
   </div>
 
