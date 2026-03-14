@@ -13,16 +13,18 @@
 [Node.js server.js]  ← http 모듈, 정적 파일 서빙
         │
 [public/]
-  ├── index.html       ← 레이아웃 뼈대, <canvas>, 사이드바 DOM
+  ├── index.html       ← 레이아웃 뼈대, <canvas>, 사이드바 DOM, Fog 토글 버튼
   ├── style.css        ← 전체 스타일
   └── js/              ← ES Modules (type="module")
-      ├── main.js      ← 진입점: 이벤트 바인딩, 게임 루프 통합
+      ├── main.js      ← 진입점: 이벤트 바인딩, AI 턴 자동 실행, Fog 토글
       ├── units.js     ← 상수: FACTIONS, UNIT_TYPES, INIT_LAYOUT
       ├── hex.js       ← 순수 함수: 좌표 변환, BFS, 거리 계산
       ├── game.js      ← 상태 관리: initState(), endTurn(), defeat()
       ├── combat.js    ← 전투 로직: calcDamage(), attack(), heal()
-      ├── render.js    ← Canvas 렌더링: render(), drawHex(), drawUnit()
-      └── ui.js        ← DOM 업데이트: updateHeader(), updateSidebar(), addLog()
+      ├── render.js    ← Canvas 렌더링: render() + Fog 오버레이 레이어
+      ├── ui.js        ← DOM 업데이트: updateHeader(), updateSidebar(), addLog()
+      ├── ai.js        ← AI 엔진: runAiTurn(), aiActUnit() [신규]
+      └── fog.js       ← Fog of War: computeVisibleHexes() [신규]
 ```
 
 ### 모듈 의존 관계
@@ -33,11 +35,13 @@ main.js
   ├── hex.js     (순수 함수만, 의존 없음)
   ├── game.js    ← units.js, hex.js
   ├── combat.js  ← units.js, game.js
-  ├── render.js  ← units.js, hex.js, game.js
-  └── ui.js      ← units.js, game.js
+  ├── render.js  ← units.js, hex.js, game.js, fog.js
+  ├── ui.js      ← units.js, game.js
+  ├── ai.js      ← units.js, hex.js, game.js, combat.js  [신규]
+  └── fog.js     ← units.js, hex.js                      [신규]
 ```
 
-**원칙**: 순환 의존 금지. `units.js`·`hex.js`는 어떤 모듈도 import하지 않는 리프 모듈.
+**원칙**: 순환 의존 금지. `units.js`·`hex.js`는 리프 모듈. `fog.js`도 리프에 가까운 단방향 의존.
 
 ---
 
@@ -270,25 +274,35 @@ export function performHeal(healer, target)
 2. 헥스 타일 (전체 맵)
    - 기본 / 이동 가능(녹색) / 이동 불가
 3. 기지 (★ 아이콘 + HP 바)
+   - 비가시 구역 적 기지: 스킵 (fogEnabled 시)
 4. 유닛 (작은 헥사곤 + 기호 + HP 바)
    - 선택됨: 흰 테두리
    - 공격 가능: 주황 테두리
    - 행동 완료: 어두운 오버레이
+   - 비가시 구역 적 유닛: 스킵 (fogEnabled 시)
 5. 이동 가능 헥스 점(dot) 오버레이
 6. 회복 가능 아군 녹색 글로우
+7. [신규] Fog 오버레이 — 비가시 헥스에 rgba(0,0,0,0.72) 사각 덮기
 ```
 
 #### 함수 목록
 
 ```javascript
-export function render(canvas, ctx, state)
+// fogEnabled: boolean, visibleSet: Set<"col,row">
+export function render(canvas, ctx, state, fogEnabled, visibleSet)
 
 // 내부 헬퍼 (export 불필요)
 function drawHex(ctx, x, y, size, fill, stroke, lineWidth)
 function drawUnit(ctx, unit, isSelected, isAttackTarget, isCurrentFaction)
 function drawBase(ctx, base, isAttackTarget)
 function drawHpBar(ctx, x, y, width, ratio)
+function drawFogOverlay(ctx, visibleSet)  // [신규]
 ```
+
+#### Fog 오버레이 렌더링 방식
+
+비가시 헥스마다 `drawHex()`로 `rgba(0,0,0,0.72)` 채움 — 기존 헥스 위에 덮어 씌움.
+유닛/기지 렌더 전에 가시 여부 체크: `!visibleSet.has(`${col},${row}`)` → 스킵.
 
 ---
 
@@ -322,24 +336,56 @@ export function hideOverlay()
 
 ### 2.8 `public/js/main.js`
 
-**역할**: 진입점. 모듈 연결, 이벤트 바인딩, 게임 초기화
+**역할**: 진입점. 모듈 연결, 이벤트 바인딩, 게임 초기화, AI 턴 자동 실행
+
+#### 주요 상태 변수 (main.js 로컬)
+
+```javascript
+let fogEnabled = true;   // Fog of War ON/OFF 토글
+let isAiTurn = false;    // AI 턴 진행 중 여부 (클릭 차단용)
+```
 
 #### 클릭 처리 흐름
 
 ```
 canvas.click(e)
   │
+  ├─ isAiTurn === true → 즉시 return (클릭 차단)
+  │
   ├─ pixelToHex(px, py) → hex
   │
   ├─ [유닛 선택 중]
-  │    ├─ 클릭 = 공격 가능 타깃?  → performAttack() → clearSelection() → render()
-  │    ├─ 클릭 = 회복 가능 아군?  → performHeal()   → clearSelection() → render()
-  │    ├─ 클릭 = 이동 가능 헥스?  → unit.col/row 이동 → 공격 타깃 재계산 → render()
-  │    ├─ 클릭 = 다른 아군 유닛?  → selectUnit() → render()
-  │    └─ 그 외                  → clearSelection() → render()
+  │    ├─ 클릭 = 공격 가능 타깃?  → attackUnit/attackBase() → clearSelection() → redraw()
+  │    ├─ 클릭 = 회복 가능 아군?  → performHeal()          → clearSelection() → redraw()
+  │    ├─ 클릭 = 이동 가능 헥스?  → moveUnit() → 재계산    → redraw()
+  │    ├─ 클릭 = 다른 아군 유닛?  → selectUnit()           → redraw()
+  │    └─ 그 외                  → clearSelection()        → redraw()
   │
   └─ [선택 없음]
-       └─ 클릭 = 현재 진영 유닛?  → selectUnit() → render()
+       └─ 클릭 = 현재 진영 유닛?  → selectUnit() → redraw()
+```
+
+#### AI 턴 자동 실행 흐름
+
+```
+endTurn() 호출
+  │
+  ├─ gameEndTurn()  ← game.js (진영 전환)
+  │
+  └─ state.currentFaction === 1 또는 2?
+       ├─ YES → isAiTurn = true
+       │         runAiTurn(factionId)  ← ai.js (async)
+       │           └─ 완료 콜백: isAiTurn = false → endTurn() 재호출
+       └─ NO  → 플레이어 턴 (연합군), 입력 대기
+```
+
+#### `redraw()` 헬퍼
+
+```javascript
+function redraw() {
+  const visibleSet = fogEnabled ? computeVisibleHexes(state) : null;
+  render(canvas, ctx, state, fogEnabled, visibleSet);
+}
 ```
 
 #### 초기화 순서
@@ -351,13 +397,114 @@ window.onload = () => {
 };
 
 function newGame() {
-  initState();          // game.js
-  hideOverlay();        // ui.js
-  updateHeader(state);  // ui.js
-  updateSidebar(null, state); // ui.js
+  initState();
+  isAiTurn = false;
+  hideOverlay();
+  updateHeader(state);
+  updateSidebar(null, state);
   addLog(state, '새 게임 시작', 'system');
-  render(canvas, ctx, state); // render.js
+  redraw();
 }
+```
+
+#### Fog 토글
+
+```javascript
+document.getElementById('btn-fog-toggle').addEventListener('click', () => {
+  fogEnabled = !fogEnabled;
+  // 버튼 텍스트 업데이트
+  redraw();
+});
+```
+
+---
+
+### 2.9 `public/js/ai.js` [신규]
+
+**역할**: 추축군·소련군 AI 턴 자동 실행 엔진
+
+#### 함수 목록
+
+```javascript
+// AI 턴 진입점 — async, 유닛별 300ms 딜레이
+export async function runAiTurn(factionId, onUnitDone)
+// onUnitDone(unit): 각 유닛 행동 후 호출 → main.js에서 redraw() + log 업데이트
+
+// 단일 유닛 행동 결정 및 실행
+function aiActUnit(unit)
+// 반환값: 'attack' | 'move' | 'heal' | 'idle'
+
+// 최저 HP 타깃 선택
+function pickLowestHpTarget(targets): Target | null
+
+// 적 기지 방향으로 이동 가능 헥스 중 가장 가까운 위치 선택
+function bestMoveToward(unit, targetCol, targetRow): {col, row} | null
+```
+
+#### AI 행동 우선순위 (aiActUnit 내부)
+
+```
+1. [의무병] 인접 아군 HP < 50% → 회복 (performHeal)
+2. [야포] 공격 가능 타깃 → 공격 (이동 없이)
+3. [일반] 공격 가능 타깃 → 최저 HP 타깃 공격
+4. [일반] 공격 불가 → bestMoveToward(연합군 기지) → 이동 후 재공격 시도
+5. 행동 없음 → idle
+```
+
+#### 딜레이 처리
+
+```javascript
+export async function runAiTurn(factionId, onUnitDone) {
+  const units = getAliveUnits(factionId);
+  for (const unit of units) {
+    await delay(300);          // setTimeout Promise wrapping
+    aiActUnit(unit);
+    onUnitDone(unit);          // → main.js: redraw() + renderLog()
+  }
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+```
+
+---
+
+### 2.10 `public/js/fog.js` [신규]
+
+**역할**: 연합군 시야 기반 Fog of War 가시 헥스 계산
+
+#### 함수 목록
+
+```javascript
+// 연합군 유닛 시야 합집합 + 기지 고정 시야 → Set<"col,row">
+export function computeVisibleHexes(state): Set<string>
+
+// 내부 헬퍼
+function addSightCircle(set, centerCol, centerRow, radius)
+// hexDistance(center, hex) <= radius 인 모든 헥스를 set에 추가
+```
+
+#### 시야 상수
+
+```javascript
+const SIGHT_RADIUS = 3;  // 유닛 시야 반경 (헥스 거리 기준)
+```
+
+#### 계산 방식
+
+```
+visibleSet = new Set()
+
+연합군 살아있는 유닛 각각:
+  for r in MAP_ROWS, c in MAP_COLS:
+    if hexDistance(unit, {c,r}) <= SIGHT_RADIUS:
+      visibleSet.add(`${c},${r}`)
+
+연합군 기지 (항상 가시):
+  addSightCircle(visibleSet, base.col, base.row, SIGHT_RADIUS)
+
+return visibleSet
 ```
 
 ---
@@ -370,8 +517,9 @@ function newGame() {
     <h1>WW2 HEX BATTLE</h1>
     <div id="turn-info"></div>
     <div id="phase-info"></div>
-    <button onclick="endTurn()">턴 종료</button>
-    <button onclick="newGame()">새 게임</button>
+    <button id="btn-fog-toggle">FOG ON</button>   <!-- [신규] Fog 토글 -->
+    <button id="btn-end-turn">턴 종료</button>
+    <button id="btn-new-game">새 게임</button>
   </div>
 
   <div id="main">
@@ -417,21 +565,38 @@ body (flex, column, 100vh)
 
 ## 5. 데이터 흐름 다이어그램
 
+### 5.1 플레이어 턴 (연합군)
+
 ```
 사용자 클릭
     │
-main.js (handleClick)
+main.js (handleClick) — isAiTurn 체크 → 차단
     │
-    ├─[이동]──→ game.js (unit 위치 변경)
-    │                │
-    ├─[공격]──→ combat.js (performAttack)
-    │                │
-    │           game.js (hp 감소, defeatFaction, checkWinCondition)
-    │
+    ├─[이동]──→ game.js (moveUnit)
+    ├─[공격]──→ combat.js (attackUnit / attackBase)
+    │               └─ game.js (defeatFaction, checkWinCondition)
     ├─[회복]──→ combat.js (performHeal)
+    └─[공통]──→ redraw()
+                  ├─ fog.js (computeVisibleHexes)   ← fogEnabled 시
+                  └─ render.js (render)
+              → ui.js (updateSidebar, addLog, renderLog)
+```
+
+### 5.2 AI 턴 (추축군·소련군)
+
+```
+endTurn() → gameEndTurn() → currentFaction = 1 or 2
     │
-    └─[공통]──→ render.js (render)     ← Canvas 재렌더
-              → ui.js    (updateSidebar, addLog, renderLog)
+    └─ isAiTurn = true
+         │
+         ai.js (runAiTurn — async)
+           └─ 유닛별 300ms 딜레이
+                └─ aiActUnit(unit)
+                     ├─ combat.js (attackUnit / attackBase / performHeal)
+                     └─ game.js (moveUnit, defeatFaction, checkWinCondition)
+                └─ onUnitDone → redraw() + renderLog()
+         │
+         완료 → isAiTurn = false → endTurn() 재호출
 ```
 
 ---
@@ -456,30 +621,34 @@ main.js (handleClick)
 
 ## 7. 파일 목록 및 역할 요약
 
-| 파일 | 줄 수 목표 | 역할 |
-|------|-----------|------|
-| `server.js` | ~40 | http 정적 서버 |
-| `public/index.html` | ~60 | DOM 뼈대 |
-| `public/style.css` | ~150 | 전체 스타일 |
-| `public/js/units.js` | ~50 | 상수 정의 |
-| `public/js/hex.js` | ~80 | 좌표 수학 |
-| `public/js/game.js` | ~120 | 상태 관리 |
-| `public/js/combat.js` | ~80 | 전투 로직 |
-| `public/js/render.js` | ~150 | Canvas 렌더링 |
-| `public/js/ui.js` | ~100 | DOM UI |
-| `public/js/main.js` | ~100 | 진입점·이벤트 |
+| 파일 | 상태 | 역할 |
+|------|------|------|
+| `server.js` | 완료 | http 정적 서버 |
+| `public/index.html` | 수정 | Fog 토글 버튼 추가 |
+| `public/style.css` | 수정 | 토글 버튼 스타일, AI 턴 표시 |
+| `public/js/units.js` | 완료 | 상수 정의 |
+| `public/js/hex.js` | 완료 | 좌표 수학 |
+| `public/js/game.js` | 완료 | 상태 관리 |
+| `public/js/combat.js` | 완료 | 전투 로직 |
+| `public/js/render.js` | 수정 | Fog 오버레이 + 비가시 유닛 스킵 |
+| `public/js/ui.js` | 수정 | AI 턴 표시 |
+| `public/js/main.js` | 수정 | AI 턴 훅, Fog 토글, 클릭 차단 |
+| `public/js/ai.js` | **신규** | AI 엔진 (async, 딜레이) |
+| `public/js/fog.js` | **신규** | Fog of War 시야 계산 |
 
 ---
 
 ## 8. 구현 순서 (Do Phase 기준)
 
-1. `server.js` + `package.json` → `npm start` 동작 확인
-2. `index.html` + `style.css` → 레이아웃 뼈대 확인
-3. `units.js` → 상수 정의
-4. `hex.js` → 좌표 함수, `hexCenter`·`hexDistance` 검증
-5. `game.js` → `initState()`, 쿼리 함수
-6. `render.js` → 헥스 맵 + 기지 + 유닛 렌더링
-7. `main.js` → 클릭 이벤트, 선택·이동 동작
-8. `combat.js` → 공격·회복 로직
-9. `ui.js` → 사이드바, 로그 패널
-10. 통합 테스트 → 턴 전환, 승패 판정
+### 기완료 (Phase 1)
+1. ~~`server.js`, `package.json`, `index.html`, `style.css`~~
+2. ~~`units.js`, `hex.js`, `game.js`, `combat.js`, `render.js`, `ui.js`, `main.js`~~
+
+### 신규 구현 (Phase 2~4)
+3. `fog.js` — `computeVisibleHexes()` 구현 및 검증
+4. `ai.js` — `runAiTurn()`, `aiActUnit()`, 딜레이 처리
+5. `render.js` 수정 — `fogEnabled`, `visibleSet` 파라미터 추가, Fog 오버레이 레이어
+6. `main.js` 수정 — `isAiTurn` 플래그, AI 턴 자동 실행, Fog 토글 연결
+7. `index.html` 수정 — `#btn-fog-toggle` 버튼 추가
+8. `style.css` 수정 — 토글 버튼 스타일
+9. 통합 검증 — AI 턴 시각화, Fog ON/OFF, 승패 판정

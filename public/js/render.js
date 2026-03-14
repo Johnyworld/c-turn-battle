@@ -1,9 +1,10 @@
 import { FACTIONS, UNIT_TYPES, MAP_COLS, MAP_ROWS, HEX_SIZE } from './units.js';
-import { hexCenter, hexNeighbors } from './hex.js';
+import { hexCenter } from './hex.js';
 import { getHealTargets } from './game.js';
 
 // ── 전체 렌더링 진입점 ──
-export function render(canvas, ctx, state) {
+// fogEnabled: boolean, visibleSet: Set<"col,row"> | null
+export function render(canvas, ctx, state, fogEnabled = false, visibleSet = null) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // 배경
@@ -19,13 +20,14 @@ export function render(canvas, ctx, state) {
   );
 
   // 의무병 회복 대상
-  let healTargetIds = new Set();
+  const healTargetIds = new Set();
   if (state.selected !== null) {
     const sel = state.units.find(u => u.id === state.selected);
-    if (sel) {
-      getHealTargets(sel).forEach(u => healTargetIds.add(u.id));
-    }
+    if (sel) getHealTargets(sel).forEach(u => healTargetIds.add(u.id));
   }
+
+  const isVisible = (col, row) =>
+    !fogEnabled || !visibleSet || visibleSet.has(`${col},${row}`);
 
   // 1. 헥스 타일
   for (let r = 0; r < MAP_ROWS; r++) {
@@ -50,6 +52,9 @@ export function render(canvas, ctx, state) {
 
   // 2. 기지
   state.bases.forEach(base => {
+    // 비가시 적 기지 스킵
+    if (fogEnabled && base.factionId !== 0 && !isVisible(base.col, base.row)) return;
+
     const { x, y } = hexCenter(base.col, base.row);
     const faction = FACTIONS[base.factionId];
     const isDefeated = state.defeated.includes(base.factionId);
@@ -59,7 +64,6 @@ export function render(canvas, ctx, state) {
     const stroke = isTarget ? '#ff8800' : (isDefeated ? '#444' : faction.color);
     drawHex(ctx, x, y, HEX_SIZE - 1, fill, stroke, isTarget ? 3 : 2);
 
-    // 기지 아이콘
     ctx.fillStyle = isDefeated ? '#444' : faction.lightColor;
     ctx.font = 'bold 18px Courier New';
     ctx.textAlign = 'center';
@@ -70,7 +74,6 @@ export function render(canvas, ctx, state) {
     ctx.font = '9px Courier New';
     ctx.fillText(faction.name.slice(0, 2), x, y + 10);
 
-    // 기지 HP 바
     if (!isDefeated) {
       drawHpBar(ctx, x, y + HEX_SIZE * 0.58, HEX_SIZE * 1.4, base.hp / base.maxHp);
     }
@@ -78,6 +81,9 @@ export function render(canvas, ctx, state) {
 
   // 3. 유닛
   state.units.filter(u => u.hp > 0).forEach(unit => {
+    // 비가시 적 유닛 스킵
+    if (fogEnabled && unit.factionId !== 0 && !isVisible(unit.col, unit.row)) return;
+
     const { x, y } = hexCenter(unit.col, unit.row);
     const faction = FACTIONS[unit.factionId];
     const type = UNIT_TYPES[unit.type];
@@ -99,21 +105,30 @@ export function render(canvas, ctx, state) {
 
     drawHex(ctx, x, y, HEX_SIZE * 0.72, fill, stroke, lineW);
 
-    // 유닛 기호
     ctx.fillStyle = '#fff';
     ctx.font = `bold ${type.symbol.length > 1 ? 9 : 12}px Courier New`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(type.symbol, x, y - 3);
 
-    // HP 바
     drawHpBar(ctx, x, y + HEX_SIZE * 0.4, HEX_SIZE * 1.2, unit.hp / unit.maxHp);
 
-    // 행동 완료 어두운 오버레이
     if (isDone && isCurrentFaction) {
       drawHex(ctx, x, y, HEX_SIZE * 0.72, 'rgba(0,0,0,0.4)', 'transparent', 0);
     }
   });
+
+  // 4. Fog 오버레이 — 비가시 헥스에 어두운 마스크
+  if (fogEnabled && visibleSet) {
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        if (!visibleSet.has(`${c},${r}`)) {
+          const { x, y } = hexCenter(c, r);
+          drawHex(ctx, x, y, HEX_SIZE - 0.5, 'rgba(0,0,0,0.78)', '#111', 0.5);
+        }
+      }
+    }
+  }
 }
 
 // ── 헥스 도형 그리기 ──

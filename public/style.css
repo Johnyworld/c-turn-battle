@@ -56,6 +56,18 @@ body {
 }
 #btn-end-turn:hover { background: #777; }
 
+#btn-fog-toggle {
+  padding: 4px 10px;
+  background: #2a3a2a;
+  color: #8e8;
+  border: 1px solid #4a8a4a;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+#btn-fog-toggle:hover { opacity: 0.85; }
+
 #btn-new-game {
   padding: 4px 12px;
   background: #3a3a2a;
@@ -67,6 +79,11 @@ body {
   font-size: 12px;
 }
 #btn-new-game:hover { background: #4a4a3a; }
+
+#btn-end-turn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 /* ── Main Layout ── */
 #main {

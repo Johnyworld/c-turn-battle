@@ -9,46 +9,90 @@ import {
 import { attackUnit, attackBase, performHeal } from './combat.js';
 import { render } from './render.js';
 import {
-  updateHeader, updateSidebar, updateFactionStatus,
+  updateHeader, updateSidebar,
   addLog, renderLog, showOverlay, hideOverlay,
 } from './ui.js';
+import { runAiTurn } from './ai.js';
+import { computeVisibleHexes } from './fog.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
+// ── 로컬 상태 ──
+let fogEnabled = true;
+let isAiTurn = false;
 
 // ── Canvas 리사이즈 ──
 function resizeCanvas() {
   const container = document.getElementById('canvas-container');
   canvas.width  = container.clientWidth;
   canvas.height = container.clientHeight;
-  render(canvas, ctx, state);
+  redraw();
+}
+
+// ── 렌더링 헬퍼 ──
+function redraw() {
+  const visibleSet = fogEnabled ? computeVisibleHexes(state) : null;
+  render(canvas, ctx, state, fogEnabled, visibleSet);
 }
 
 // ── 새 게임 ──
 function newGame() {
   hideOverlay();
+  isAiTurn = false;
   initState();
+  updateFogButton();
   addLog(state, '=== 새 게임 시작 ===', 'system');
   addLog(state, `${FACTIONS[0].name}의 턴`, 'system');
   updateHeader(state);
   updateSidebar(null, state);
-  render(canvas, ctx, state);
+  redraw();
 }
 
 // ── 턴 종료 ──
-function endTurn() {
+async function endTurn() {
   if (state.winner !== null) return;
+  if (isAiTurn) return;
+
   gameEndTurn();
   clearSelection();
-  addLog(state, `--- ${FACTIONS[state.currentFaction].name}의 턴 (Turn ${state.turn}) ---`, 'system');
   updateHeader(state);
   updateSidebar(null, state);
-  render(canvas, ctx, state);
+
+  // AI 진영 턴이면 자동 실행
+  if (state.currentFaction !== 0 && !state.defeated.includes(state.currentFaction)) {
+    isAiTurn = true;
+    updateAiTurnUI(true);
+    addLog(state, `--- ${FACTIONS[state.currentFaction].name} AI 턴 (Turn ${state.turn}) ---`, 'system');
+    redraw();
+
+    await runAiTurn(state.currentFaction, (unit) => {
+      renderLog(state);
+      redraw();
+    });
+
+    isAiTurn = false;
+    updateAiTurnUI(false);
+
+    const winner = checkWinCondition();
+    if (winner !== null) {
+      handleGameEnd(winner);
+      redraw();
+      return;
+    }
+
+    // 다음 턴이 또 AI면 연속 진행, 아니면 플레이어 턴
+    await endTurn();
+  } else {
+    addLog(state, `--- ${FACTIONS[state.currentFaction].name}의 턴 (Turn ${state.turn}) ---`, 'system');
+    redraw();
+  }
 }
 
 // ── 클릭 처리 ──
 function handleClick(e) {
   if (state.winner !== null) return;
+  if (isAiTurn) return;
 
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width  / rect.width;
@@ -67,24 +111,18 @@ function handleClick(e) {
     _handleClickNoSelection(col, row);
   }
 
-  // 승리 판정
   const winner = checkWinCondition();
   if (winner !== null) {
-    if (winner === -1) {
-      showOverlay('무승부', '모든 진영의 기지가 동시에 함락되었습니다.');
-    } else {
-      showOverlay(`${FACTIONS[winner].name} 승리!`, '모든 적 기지가 함락되었습니다.');
-    }
+    handleGameEnd(winner);
   }
 
   updateSidebar(
     state.selected !== null ? state.units.find(u => u.id === state.selected) : null,
     state
   );
-  render(canvas, ctx, state);
+  redraw();
 }
 
-// ── 유닛 선택 중 클릭 ──
 function _handleClickWithSelection(col, row) {
   const sel = state.units.find(u => u.id === state.selected);
   if (!sel) { clearSelection(); return; }
@@ -130,7 +168,6 @@ function _handleClickWithSelection(col, row) {
   if (canMove && !sel.moved) {
     moveUnit(sel, col, row);
     addLog(state, `${FACTIONS[sel.factionId].name} ${UNIT_TYPES[sel.type].label} 이동`, 'move');
-    // 이동 후 공격/회복 대상 없으면 선택 해제
     if (state.attackable.length === 0 && getHealTargets(sel).length === 0) {
       clearSelection();
     }
@@ -144,18 +181,48 @@ function _handleClickWithSelection(col, row) {
     return;
   }
 
-  // 6. 그 외: 선택 해제
   clearSelection();
 }
 
-// ── 선택 없을 때 클릭 ──
 function _handleClickNoSelection(col, row) {
   const unit = getUnitAt(col, row);
   if (!unit) return;
   if (unit.factionId !== state.currentFaction) return;
   if (state.defeated.includes(unit.factionId)) return;
-  if (unit.moved && unit.attacked) return; // 행동 완료
+  if (unit.moved && unit.attacked) return;
   selectUnit(unit);
+}
+
+// ── 게임 종료 처리 ──
+function handleGameEnd(winner) {
+  if (winner === -1) {
+    showOverlay('무승부', '모든 진영의 기지가 함락되었습니다.');
+  } else {
+    showOverlay(`${FACTIONS[winner].name} 승리!`, '모든 적 기지가 함락되었습니다.');
+  }
+}
+
+// ── Fog 토글 ──
+function toggleFog() {
+  fogEnabled = !fogEnabled;
+  updateFogButton();
+  redraw();
+}
+
+function updateFogButton() {
+  const btn = document.getElementById('btn-fog-toggle');
+  if (!btn) return;
+  btn.textContent = fogEnabled ? 'FOG ON' : 'FOG OFF';
+  btn.style.background = fogEnabled ? '#2a3a2a' : '#3a3a1a';
+  btn.style.color = fogEnabled ? '#8e8' : '#aa8';
+  btn.style.borderColor = fogEnabled ? '#4a8a4a' : '#888';
+}
+
+function updateAiTurnUI(active) {
+  const btn = document.getElementById('btn-end-turn');
+  if (btn) btn.disabled = active;
+  const phase = document.getElementById('phase-info');
+  if (phase && active) phase.textContent = `${FACTIONS[state.currentFaction].name} AI 진행 중...`;
 }
 
 // ── 이벤트 바인딩 ──
@@ -164,6 +231,7 @@ window.addEventListener('resize', resizeCanvas);
 document.getElementById('btn-end-turn').addEventListener('click', endTurn);
 document.getElementById('btn-new-game').addEventListener('click', newGame);
 document.getElementById('btn-overlay-new').addEventListener('click', newGame);
+document.getElementById('btn-fog-toggle').addEventListener('click', toggleFog);
 
 // ── 초기 실행 ──
 resizeCanvas();
